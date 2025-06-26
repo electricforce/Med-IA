@@ -44,8 +44,6 @@ const { data: doctor_hospital, error:error_doctor_hospital } = await supabase.fr
 
 let { data: all_hospitales, error: hospitaless } = await supabase.from('hospitales').select('id,nombre');
 
-let { data: citas, error:citaserror } = await supabase.from('citas').select('id_usuario,id_doctor,id_hospital,descripcion,fecha,horario')
-  
 
 let info_doctores = doctores.map(doc => {
   const hospital_ids = doctor_hospital
@@ -66,61 +64,9 @@ let info_doctores = doctores.map(doc => {
 });
 
 
-
-function obtenerInfoCitasPorUsuario(userId) {
-  // Filtrar citas del usuario
-  const citasUsuario = citas.filter(cita => cita.id_usuario === userId);
-
-  // Mapear y enriquecer info
-  return citasUsuario.map(cita => {
-    const doctor = doctores.find(doc => doc.id === cita.id_doctor) || {};
-    const hospitalIds = doctor_hospital
-      .filter(dh => dh.id_doctor === doctor.id)
-      .map(dh => dh.id_hospital);
-
-    const nombresHospitales = all_hospitales
-      .filter(h => hospitalIds.includes(h.id))
-      .map(h => h.nombre);
-
-    return {
-      id_usuario: cita.id_usuario,
-      id_doctor: doctor.id,
-      doctor_nombre: doctor.nombre || 'Desconocido',
-      doctor_apellido: doctor.apellido || '',
-      doctor_especialidad: doctor.especialidad || '',
-      hospitales: nombresHospitales,
-      descripcion: cita.descripcion,
-      fecha: cita.fecha,
-      horario: cita.horario,
-    };
-  });
-}
-
-
-app.get('/api/citasUsuario/:userId', (req, res) => {
-  const userId = req.params.userId; // Aquí tomas el parámetro de la URL
-
-  if (!userId) {
-    return res.status(400).json({ error: 'Falta parámetro userId' });
-  }
-
-  const citasUsuario = obtenerInfoCitasPorUsuario(userId);
-
-  if (citasUsuario.length === 0) {
-    return res.status(404).json({ error: 'No se encontraron citas para este usuario' });
-  }
-
-  res.json({ citas: citasUsuario });
-});
-
-
-
 app.get('/api/doctores', (req,res)=>{
   res.send({ info_doctores, error });
 });
-
-
-
 
 
 
@@ -139,6 +85,7 @@ app.get('/api/doctores/:especialidad', (req, res) => {
     return res.send(especialistas);
   }
 });
+
 
 
 
