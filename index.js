@@ -1,77 +1,168 @@
-import express from "express";
-import fs from "fs";
-import bodyParser from "body-parser";
+import 'dotenv/config';
+import { createClient } from '@supabase/supabase-js'
+import express from 'express';
+import { Client } from '@botpress/client'
 
 const app = express();
-app.use(bodyParser.json());
+app.use(express.json());
 
-const readData = () => {
-  try {
-    const data = fs.readFileSync("./db.json");
-    return JSON.parse(data);
-  } catch (error) {
-    console.log(error);
-  }
-};
 
-const writeData = (data) => {
-  try {
-    fs.writeFileSync("./db.json", JSON.stringify(data));
-  } catch (error) {
-    console.log(error);
-  }
-};
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_KEY;
 
-app.get("/", (req, res) => {
-  res.send("Welcome to my first API with Node js!");
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+
+const client = new Client({
+  token: 'bp_pat_unWEU4ZEaZ9qze1uYRS4GALGT8D2lbMa2MZ6',
+  botId: 'bfb54e1a-3620-481f-a156-6e271d847c58',
+  workspaceId: 'wkspace_01JYAGCK34QZQZTBVXVW56C0MP'
+})
+
+
+
+function normalizarTexto(texto) {
+  return texto
+    .normalize('NFD')                  
+    .replace(/[\u0300-\u036f]/g, '')   
+    .toLowerCase();                   
+}
+
+
+
+app.get('/', (req,res) =>{
+  res.send('Med-IA');
 });
 
-app.get("/books", (req, res) => {
-  const data = readData();
-  res.json(data.books);
-});
 
-app.get("/books/:id", (req, res) => {
-  const data = readData();
-  const id = parseInt(req.params.id);
-  const book = data.books.find((book) => book.id === id);
-  res.json(book);
-});
 
-app.post("/books", (req, res) => {
-  const data = readData();
-  const body = req.body;
-  const newBook = {
-    id: data.books.length + 1,
-    ...body,
+
+//informacion de los doctores
+const { data: doctores, error } = await supabase.from("doctores").select("id,nombre,apellido,especialidad");
+
+
+const { data: doctor_hospital, error:error_doctor_hospital } = await supabase.from('doctor_hospital').select('id_doctor,id_hospital');
+
+let { data: all_hospitales, error: hospitaless } = await supabase.from('hospitales').select('id,nombre');
+
+
+let info_doctores = doctores.map(doc => {
+  const hospital_ids = doctor_hospital
+    .filter(dh => dh.id_doctor === doc.id)
+    .map(dh => dh.id_hospital);
+
+  const nombres_hospitales = all_hospitales
+    .filter(h => hospital_ids.includes(h.id))
+    .map(h => h.nombre);
+
+  return {
+    id: doc.id,
+    nombre: doc.nombre,
+    apellido: doc.apellido,
+    especialidad: doc.especialidad,
+    nombres_hospitales: nombres_hospitales
   };
-  data.books.push(newBook);
-  writeData(data);
-  res.json(newBook);
 });
 
-app.put("/books/:id", (req, res) => {
-  const data = readData();
-  const body = req.body;
-  const id = parseInt(req.params.id);
-  const bookIndex = data.books.findIndex((book) => book.id === id);
-  data.books[bookIndex] = {
-    ...data.books[bookIndex],
-    ...body,
-  };
-  writeData(data);
-  res.json({ message: "Book updated successfully" });
+
+app.get('/api/doctores', (req,res)=>{
+  res.send({ info_doctores, error });
 });
 
-app.delete("/books/:id", (req, res) => {
-  const data = readData();
-  const id = parseInt(req.params.id);
-  const bookIndex = data.books.findIndex((book) => book.id === id);
-  data.books.splice(bookIndex, 1);
-  writeData(data);
-  res.json({ message: "Book deleted successfully" });
+
+
+//informacion de los doctores por especialidad
+
+app.get('/api/doctores/:especialidad', (req, res) => {
+  const especialidadBuscada = normalizarTexto(req.params.especialidad);
+
+  const especialistas = doctores.filter(e =>
+    normalizarTexto(e.especialidad) === especialidadBuscada
+  );
+
+  if (especialistas.length === 0) {
+    return res.status(404).send('Especialistas no encontrados');
+  } else {
+    return res.send(especialistas);
+  }
 });
 
-app.listen(3000, () => {
-  console.log("Server listening on port 3000");
+
+
+
+// Insertar citas 
+
+app.post('/api/citas', async (req, res) => {
+  try {
+    // Obtener campos desde el body
+    const { id_usuario, id_doctor, id_hospital, descripcion, fecha, horario } = req.body
+
+    // Validación básica
+    if (!id_usuario || !id_doctor || !id_hospital || !fecha || !horario) {
+      return res.status(400).json({ error: 'Faltan datos obligatorios' });
+    }
+
+    // Insertar cita en la base de datos
+    const { data, error } = await supabase
+      .from('citas')
+      .insert([{
+        id_usuario,
+        id_doctor,
+        id_hospital,
+        descripcion,
+        fecha,
+        horario
+      }])
+      .select();
+
+    if (error) return res.status(400).json({ error: error.message });
+
+    res.status(201).json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
+
+
+
+
+app.delete('/api/students/:id',(req,res) =>{
+  const student = students.find(c => c.id === parseInt(req.params.id))
+  if (!student) return res.status(404).send('Estudiante no encontrado');
+  
+  const index = students.indexOf(student);
+  students.splice(index,1);
+  res.send(student);
+});
+
+
+//api para enviar el usuario a botpres
+
+app.post('/actualizar-botpress', async (req, res) => {
+  const { userId } = req.body
+
+  if (!userId) {
+    return res.status(400).json({ error: 'Falta userId' })
+  }
+
+  try {
+    const { rows, errors } = await client.updateTableRows({
+      table: 'usuarioTable',
+      rows: [{ id: 1, usuario: userId }]
+    })
+
+    if (errors?.length) {
+      console.error("Errores al actualizar:", errors)
+      return res.status(500).json({ error: 'Error en Botpress', details: errors })
+    }
+
+    res.status(200).json({ success: true, data: rows })
+  } catch (err) {
+    console.error("Error general:", err)
+    res.status(500).json({ error: 'Error interno del servidor' })
+  }
+})
+
+
+
+const port = process.env.port  || 80;
+app.listen(port, ()=> console.log (`Escuchando en el puerto ${port}....`));

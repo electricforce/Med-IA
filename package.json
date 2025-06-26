@@ -1,20 +1,31 @@
 {
-  "name": "simple-nodejs-api",
+  "name": "med-ia",
   "version": "1.0.0",
   "description": "my first api with nodejs",
-  "main": "index.js",
-  "type": "module",
-  "scripts": {
-    "dev": "nodemon index.js"
-  },
   "keywords": [
     "node",
     "js"
   ],
-  "author": "monkeywit",
+  "homepage": "https://github.com/electricforce/Med-IA#readme",
+  "bugs": {
+    "url": "https://github.com/electricforce/Med-IA/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/electricforce/Med-IA.git"
+  },
   "license": "ISC",
+  "author": "monkeywit",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon index.js"
+  },
   "dependencies": {
-    "express": "^4.18.2"
+    "@botpress/client": "^1.16.1",
+    "@supabase/supabase-js": "^2.50.0",
+    "dotenv": "^16.5.0",
+    "express": "^4.21.2"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
